@@ -15,5 +15,6 @@ type Settings struct {
 	LongBreakInterval  int64     `json:"long_break_interval"`
 	AutoStartWork      bool      `json:"auto_start_work"`
 	AutoStartBreak     bool      `json:"auto_start_break"`
+	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }
