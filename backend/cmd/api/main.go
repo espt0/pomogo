@@ -8,10 +8,16 @@ import (
 
 	"github.com/espt0/pomogo/internal/db"
 
+	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v5"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		slog.Error("erro ao carregar o arquivo .env", "error", err)
+		os.Exit(1)
+	}
+
 	ctx := context.Background()
 
 	DB, err := db.Connect()
