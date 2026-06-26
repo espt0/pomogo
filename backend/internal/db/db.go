@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func Connect() (*pgxpool.Pool, error) {
+func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 	user := os.Getenv("DB_USER")
 	password := os.Getenv("DB_PASSWORD")
 	dbName := os.Getenv("DB_DBNAME")
@@ -18,8 +18,6 @@ func Connect() (*pgxpool.Pool, error) {
 	port := os.Getenv("DB_PORT")
 
 	connString := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=disable", user, password, host, port, dbName)
-
-	ctx := context.Background()
 
 	config, err := pgxpool.ParseConfig(connString)
 	if err != nil {
