@@ -6,13 +6,18 @@ import (
 	"github.com/labstack/echo/v5"
 )
 
-// Criar, Ler, Atualizar, Excluir (CRUD)
 func SetupRoutes(e *echo.Echo, h *handler.Handler) error {
-
 	v1 := e.Group("/api/v1")
 
-	protected := v1.Group("")
+	// Público
+	auth := v1.Group("auth")
+	auth.POST("/register", h.Registrar)
+	auth.POST("/login", h.Login)
+	auth.POST("/refresh", h.RefreshToken)
+	auth.POST("/logout", h.Logout)
 
+	// Protegido
+	protected := v1.Group("")
 	// Users
 	protected.GET("/users/me", h.ListaUser)
 	protected.PATCH("/users/me", h.AtualizaUser)
@@ -25,6 +30,18 @@ func SetupRoutes(e *echo.Echo, h *handler.Handler) error {
 	protected.GET("/task/:id", h.ListaTaskID)
 	protected.PATCH("/task/:id", h.AtualizaTask)
 	protected.DELETE("/task/:id", h.DeletaTask)
+
+	// Sessions
+	protected.POST("/sessions", h.IniciaSession)
+	protected.PATCH("/sessions/:id/end", h.FinalizaSession)
+	protected.GET("/sessions", h.Historico)
+
+	// Settings
+	protected.GET("/settings", h.VerSettings)
+	protected.PUT("/settings", h.AtualizaSettings)
+
+	// Timer (SSE)
+	protected.GET("/time/stream", h.AtualizaOTimer)
 
 	return nil
 }
