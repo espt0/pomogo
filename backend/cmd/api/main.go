@@ -10,6 +10,7 @@ import (
 	"github.com/espt0/pomogo/internal/repository"
 	"github.com/espt0/pomogo/internal/routes"
 	"github.com/espt0/pomogo/internal/service"
+	"github.com/espt0/pomogo/internal/validator"
 
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v5"
@@ -38,6 +39,9 @@ func main() {
 	// Cria instância do Echo
 	e := echo.New()
 
+	// Validação
+	e.Validator = validator.NewEchoValidator()
+
 	// Injeção de dependência
 	repo := repository.NewRepository(DB)
 	service := service.NewService(repo)
@@ -53,10 +57,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-
-/*
-1. Conexão com banco
-2. Ping no banco
-3. Configurar rotas/handlers
-4. e.Start() (por último)
-*/
