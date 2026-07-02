@@ -17,3 +17,16 @@ type Task struct {
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }
+
+type CreateTaskRequest struct {
+	Title              string `json:"title" validate:"required,min=3,max=200"`
+	Description        string `json:"description" validate:"required,max=1000"`
+	EstimatedPomodoros int64  `json:"estimated_pomodoros" validate:"required,min=1"`
+}
+
+type UpdateTaskRequest struct {
+	Title              *string `json:"title" validate:"omitempty,min=3,max=200"`
+	Description        *string `json:"description" validate:"omitempty,max=1000"`
+	Status             *string `json:"status" validate:"omitempty,oneof=pending in_progress completed archived"`
+	EstimatedPomodoros *int64  `json:"estimated_pomodoros" validate:"omitempty,min=1"`
+}

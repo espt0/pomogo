@@ -18,3 +18,10 @@ type Settings struct {
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }
+
+type UpdateSettingsRequest struct {
+	WorkDuration       *int64 `json:"work_duration" validate:"omitempty,min=1,max=180"`
+	ShortBreakDuration *int64 `json:"short_break_duration" validate:"omitempty,min=1,max=40"`
+	LongBreakDuration  *int64 `json:"long_break_duration" validate:"omitempty,min=1,max=80"`
+	LongBreakInterval  *int64 `json:"long_break_interval" validate:"omitempty,min=1,max=20"`
+}
