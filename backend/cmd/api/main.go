@@ -7,6 +7,7 @@ import (
 
 	"github.com/espt0/pomogo/internal/db"
 	"github.com/espt0/pomogo/internal/handler"
+	"github.com/espt0/pomogo/internal/middlewareConfig"
 	"github.com/espt0/pomogo/internal/repository"
 	"github.com/espt0/pomogo/internal/routes"
 	"github.com/espt0/pomogo/internal/service"
@@ -14,13 +15,14 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 )
 
 func main() {
 	ctx := context.Background()
 
 	// Banco de dados
-	if err := godotenv.Load(); err != nil {
+	if err := godotenv.Load("../../.env"); err != nil {
 		slog.Error("erro ao carregar o arquivo .env", "error", err)
 		os.Exit(1)
 	}
@@ -38,6 +40,13 @@ func main() {
 
 	// Cria instância do Echo
 	e := echo.New()
+
+	// Middlewares
+	e.Use(middleware.Recover())
+	e.Use(middleware.RequestLogger())
+	// CORS vou add depois
+	e.Use(middleware.ContextTimeoutWithConfig(middlewareConfig.TimeoutMiddleware()))
+	e.Use(middleware.Gzip())
 
 	// Validação
 	e.Validator = validator.NewEchoValidator()
