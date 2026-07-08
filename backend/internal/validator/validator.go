@@ -22,13 +22,13 @@ func NewEchoValidator() *CustomValidator {
 }
 
 func (cv *CustomValidator) Validate(i interface{}) error {
-	if err := Get().Struct(i); err != nil { // usa o singleton
+	if err := get().Struct(i); err != nil { // usa o singleton
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return nil
 }
 
-func Get() *validator.Validate {
+func get() *validator.Validate {
 
 	once.Do(func() {
 		instance = validator.New(validator.WithRequiredStructEnabled())
