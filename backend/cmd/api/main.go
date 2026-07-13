@@ -7,7 +7,7 @@ import (
 
 	"github.com/espt0/pomogo/internal/db"
 	"github.com/espt0/pomogo/internal/handler"
-	"github.com/espt0/pomogo/internal/middlewareConfig"
+	"github.com/espt0/pomogo/internal/mw"
 	"github.com/espt0/pomogo/internal/repository"
 	"github.com/espt0/pomogo/internal/routes"
 	"github.com/espt0/pomogo/internal/service"
@@ -45,7 +45,7 @@ func main() {
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestLogger())
 	// CORS vou add depois
-	e.Use(middleware.ContextTimeoutWithConfig(middlewareConfig.TimeoutMiddleware()))
+	e.Use(middleware.ContextTimeoutWithConfig(mw.TimeoutMiddleware()))
 	e.Use(middleware.Gzip())
 
 	// Validação
