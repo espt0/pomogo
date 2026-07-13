@@ -1,8 +1,8 @@
 -- +goose Up
-CREATE TABLE sessions (
+CREATE TABLE session (
     id                UUID PRIMARY KEY,
     user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    task_id           UUID NULL REFERENCES tasks(id) ON DELETE SET NULL,
+    task_id           UUID NULL REFERENCES task(id) ON DELETE SET NULL,
     type              VARCHAR(50) NOT NULL
         CHECK (type IN ('work', 'short_break', 'long_break')),
     duration_minutes  INTEGER NOT NULL DEFAULT 0,
@@ -18,8 +18,8 @@ CREATE TABLE sessions (
         )
 );
 
-CREATE INDEX idx_sessions_user_id ON sessions(user_id);
-CREATE INDEX idx_sessions_task_id ON sessions(task_id);
+CREATE INDEX idx_session_user_id ON session(user_id);
+CREATE INDEX idx_session_task_id ON session(task_id);
 
 -- +goose Down
-DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS session;
