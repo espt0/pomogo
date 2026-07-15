@@ -16,7 +16,7 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func GerarAccessToken(userID uuid.UUID) (string, error) {
+func GenerateAccessToken(userID uuid.UUID) (string, error) {
 	claims := Claims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -28,7 +28,7 @@ func GerarAccessToken(userID uuid.UUID) (string, error) {
 	return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 }
 
-func GerarRefreshToken() (raw, hash string, err error) {
+func GenerateRefreshToken() (raw, hash string, err error) {
 	b := make([]byte, 32)
 
 	// Gera (token) números aleatórios criptograficamente seguros
