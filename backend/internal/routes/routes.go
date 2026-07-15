@@ -2,7 +2,7 @@ package routes
 
 import (
 	"github.com/espt0/pomogo/internal/handler"
-	"github.com/espt0/pomogo/internal/middlewareConfig"
+	"github.com/espt0/pomogo/internal/mw"
 
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
@@ -13,13 +13,13 @@ func SetupRoutes(e *echo.Echo, h *handler.Handler) error {
 
 	// Público
 	auth := v1.Group("/auth", middleware.RateLimiter(middleware.NewRateLimiterMemoryStore(3.0)))
-	auth.POST("/register", h.Registrar)
+	auth.POST("/register", h.Register)
 	auth.POST("/login", h.Login)
 	auth.POST("/refresh", h.RefreshToken)
 	auth.POST("/logout", h.Logout)
 
 	// Protegido
-	protected := v1.Group("", middlewareConfig.JWTMiddleware())
+	protected := v1.Group("", mw.JWTMiddleware())
 
 	// Users
 	protected.GET("/users/me", h.ListaUser)
