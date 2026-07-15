@@ -14,3 +14,9 @@ type RefreshToken struct {
 	Revoked   bool      `json:"revoked" db:"revoked"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 }
+
+type TokenResponse struct {
+	AccessToken string `json:"accessToken"`
+	TokenType   string `json:"tokenType"`
+	ExpiresIn   int64  `json:"expiresIn"`
+}
