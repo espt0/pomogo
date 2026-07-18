@@ -28,23 +28,23 @@ func SetupRoutes(e *echo.Echo, h *handler.Handler) error {
 	protected.DELETE("/users/me", h.DeleteCurrentUser)
 
 	// Task
-	protected.POST("/task", h.CriaTask)
-	protected.GET("/task", h.ListaTodasTasks)
-	protected.GET("/task/:id", h.ListaTaskID)
-	protected.PATCH("/task/:id", h.AtualizaTask)
-	protected.DELETE("/task/:id", h.DeletaTask)
+	protected.POST("/task", h.CreateTask)
+	protected.GET("/task", h.ListTasks)
+	protected.GET("/task/:id", h.GetTask)
+	protected.PATCH("/task/:id", h.UpdateTask)
+	protected.DELETE("/task/:id", h.DeleteTask)
 
 	// Sessions
-	protected.POST("/sessions", h.IniciaSession)
-	protected.PATCH("/sessions/:id/end", h.FinalizaSession)
-	protected.GET("/sessions", h.Historico)
+	protected.POST("/sessions", h.StartSession)
+	protected.PATCH("/sessions/:id/end", h.EndSession)
+	protected.GET("/sessions", h.ListSessions)
 
 	// Settings
-	protected.GET("/settings", h.VerSettings)
-	protected.PUT("/settings", h.AtualizaSettings)
+	protected.GET("/settings", h.GetSettings)
+	protected.PUT("/settings", h.UpdateSettings)
 
 	// Timer (SSE)
-	protected.GET("/time/stream", h.AtualizaOTimer)
+	protected.GET("/time/stream", h.StreamTimer)
 
 	return nil
 }

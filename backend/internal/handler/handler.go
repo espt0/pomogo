@@ -230,43 +230,43 @@ func (h *Handler) DeleteCurrentUser(c *echo.Context) error {
 }
 
 // Task
-func (h *Handler) CriaTask(c *echo.Context) error {
+func (h *Handler) CreateTask(c *echo.Context) error {
 	return c.JSON(http.StatusCreated, map[string]string{"Task": "CRIADO"})
 }
-func (h *Handler) ListaTodasTasks(c *echo.Context) error {
+func (h *Handler) ListTasks(c *echo.Context) error {
 	return c.String(http.StatusFound, "Todas as TASKS")
 }
-func (h *Handler) ListaTaskID(c *echo.Context) error {
+func (h *Handler) GetTask(c *echo.Context) error {
 	return c.String(http.StatusFound, "TASK específica")
 }
-func (h *Handler) AtualizaTask(c *echo.Context) error {
+func (h *Handler) UpdateTask(c *echo.Context) error {
 	return c.String(http.StatusFound, "Atualiza TASK")
 }
-func (h *Handler) DeletaTask(c *echo.Context) error {
+func (h *Handler) DeleteTask(c *echo.Context) error {
 	return c.String(http.StatusFound, "Deleta TASK")
 }
 
 // Sessions
-func (h *Handler) IniciaSession(c *echo.Context) error {
+func (h *Handler) StartSession(c *echo.Context) error {
 	return c.String(http.StatusFound, "TASK específica")
 }
-func (h *Handler) FinalizaSession(c *echo.Context) error {
+func (h *Handler) EndSession(c *echo.Context) error {
 	return c.String(http.StatusFound, "Atualiza TASK")
 }
-func (h *Handler) Historico(c *echo.Context) error {
+func (h *Handler) ListSessions(c *echo.Context) error {
 	return c.String(http.StatusFound, "Deleta TASK")
 }
 
 // Settings
-func (h *Handler) VerSettings(c *echo.Context) error {
+func (h *Handler) GetSettings(c *echo.Context) error {
 	return c.String(http.StatusFound, "Atualiza TASK")
 }
-func (h *Handler) AtualizaSettings(c *echo.Context) error {
+func (h *Handler) UpdateSettings(c *echo.Context) error {
 	return c.String(http.StatusFound, "Deleta TASK")
 }
 
 // Timer
-func (h *Handler) AtualizaOTimer(c *echo.Context) error {
+func (h *Handler) StreamTimer(c *echo.Context) error {
 	return c.String(http.StatusFound, "Deleta TASK")
 }
 
