@@ -22,10 +22,10 @@ func SetupRoutes(e *echo.Echo, h *handler.Handler) error {
 	protected := v1.Group("", mw.JWTMiddleware())
 
 	// Users
-	protected.GET("/users/me", h.ListaUser)
-	protected.PATCH("/users/me", h.AtualizaUser)
-	protected.PATCH("/users/me/password", h.AtualizaSenha)
-	protected.DELETE("/users/me", h.DeletaUser)
+	protected.GET("/users/me", h.GetCurrentUser)
+	protected.PATCH("/users/me", h.UpdateCurrentUser)
+	protected.PATCH("/users/me/password", h.UpdatePassword)
+	protected.DELETE("/users/me", h.DeleteCurrentUser)
 
 	// Task
 	protected.POST("/task", h.CriaTask)
