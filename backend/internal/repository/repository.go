@@ -10,6 +10,7 @@ import (
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -24,8 +25,7 @@ func NewRepository(DB *pgxpool.Pool) *Repository {
 func (r *Repository) EmailExists(ctx context.Context, email string) (bool, error) {
 	var exists bool
 
-	err := r.DB.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)", email).Scan(&exists)
-	if err != nil {
+	if err := r.DB.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)", email).Scan(&exists); err != nil {
 		return false, fmt.Errorf("erro ao verificar email: %w", err)
 	}
 
@@ -35,8 +35,7 @@ func (r *Repository) EmailExists(ctx context.Context, email string) (bool, error
 func (r *Repository) FindUserByEmail(ctx context.Context, email string) (*model.User, error) {
 	user := new(model.User)
 
-	err := r.DB.QueryRow(ctx, "SELECT id, name, email, password_hash, active, created_at, updated_at FROM users WHERE email = $1", email).Scan(&user.ID, &user.Name, &user.Email, &user.PasswordHash, &user.Active, &user.CreatedAt, &user.UpdatedAt)
-	if err != nil {
+	if err := r.DB.QueryRow(ctx, "SELECT id, name, email, password_hash, active, created_at, updated_at FROM users WHERE email = $1", email).Scan(&user.ID, &user.Name, &user.Email, &user.PasswordHash, &user.Active, &user.CreatedAt, &user.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperrors.ErrUserNotFound
 		}
@@ -68,8 +67,7 @@ func (r *Repository) CreateUser(ctx context.Context, user model.User) error {
 func (r *Repository) FindActiveRefreshTokenByHash(ctx context.Context, hashRefreshToken string) (*model.RefreshToken, error) {
 	rT := new(model.RefreshToken)
 
-	err := r.DB.QueryRow(ctx, "SELECT id, user_id, token_hash, expires_at, revoked, created_at FROM refresh_token WHERE token_hash = $1 AND revoked = false AND expires_at > NOW()", hashRefreshToken).Scan(&rT.ID, &rT.UserID, &rT.TokenHash, &rT.ExpiresAt, &rT.Revoked, &rT.CreatedAt)
-	if err != nil {
+	if err := r.DB.QueryRow(ctx, "SELECT id, user_id, token_hash, expires_at, revoked, created_at FROM refresh_token WHERE token_hash = $1 AND revoked = false AND expires_at > NOW()", hashRefreshToken).Scan(&rT.ID, &rT.UserID, &rT.TokenHash, &rT.ExpiresAt, &rT.Revoked, &rT.CreatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperrors.ErrInvalidRefreshToken
 		}
@@ -95,5 +93,51 @@ func (r *Repository) RevokeRefreshTokenByHash(ctx context.Context, tokenHash str
 	if err != nil {
 		return fmt.Errorf("erro ao revogar refresh token por hash: %w", err)
 	}
+	return nil
+}
+
+func (r *Repository) GetUserByID(ctx context.Context, userID uuid.UUID) (*model.User, error) {
+	user := new(model.User)
+
+	if err := r.DB.QueryRow(ctx, "SELECT id, name, email, active, created_at, updated_at FROM users WHERE id = $1 AND active = true", userID).Scan(&user.ID, &user.Name, &user.Email, &user.Active, &user.CreatedAt, &user.UpdatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.ErrUserNotFound
+		}
+
+		return nil, fmt.Errorf("erro ao buscar usuário: %w", err)
+	}
+
+	return user, nil
+}
+
+func (r *Repository) UpdateUser(ctx context.Context, name, email string, userID uuid.UUID) error {
+	_, err := r.DB.Exec(ctx, "UPDATE users SET name = $1, email = $2, updated_at = NOW() WHERE id = $3", name, email, userID)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return apperrors.ErrEmailAlreadyExists
+		}
+
+		return fmt.Errorf("erro ao atualizar usuário: %w", err)
+	}
+
+	return nil
+}
+
+func (r *Repository) UpdatePassword(ctx context.Context, passwordHash string, userID uuid.UUID) error {
+	_, err := r.DB.Exec(ctx, "UPDATE users SET password_hash = $1 WHERE id = $2", passwordHash, userID)
+	if err != nil {
+		return fmt.Errorf("erro ao atualizar password: %w", err)
+	}
+
+	return nil
+}
+
+func (r *Repository) DeleteUser(ctx context.Context, userID uuid.UUID) error {
+	_, err := r.DB.Exec(ctx, "UPDATE users SET active = false WHERE id = $1", userID)
+	if err != nil {
+		return fmt.Errorf("erro ao deletar usuário: %w", err)
+	}
+
 	return nil
 }

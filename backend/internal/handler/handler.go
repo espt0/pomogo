@@ -7,9 +7,12 @@ import (
 	"time"
 
 	"github.com/espt0/pomogo/internal/apperrors"
+	"github.com/espt0/pomogo/internal/auth"
 	"github.com/espt0/pomogo/internal/model"
 	"github.com/espt0/pomogo/internal/service"
 
+	"github.com/gofrs/uuid/v5"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v5"
 )
 
@@ -34,8 +37,7 @@ func (h *Handler) Register(c *echo.Context) error {
 		return c.JSON(http.StatusUnprocessableEntity, map[string]string{"erro": err.Error()})
 	}
 
-	err := h.service.CreateUser(ctx, req)
-	if err != nil {
+	if err := h.service.CreateUser(ctx, req); err != nil {
 		if errors.Is(err, apperrors.ErrEmailAlreadyExists) {
 			return c.JSON(http.StatusConflict, map[string]string{"erro": "email já cadastrado"})
 		}
@@ -143,17 +145,88 @@ func (h *Handler) Logout(c *echo.Context) error {
 }
 
 // User
-func (h *Handler) ListaUser(c *echo.Context) error {
-	return c.String(http.StatusFound, "Todas as TASKS")
+func (h *Handler) GetCurrentUser(c *echo.Context) error {
+	ctx := c.Request().Context()
+
+	userID, err := h.extractUserID(c)
+	if err != nil {
+		return err
+	}
+
+	user, err := h.service.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrUserNotFound) {
+			return c.JSON(http.StatusNotFound, map[string]string{"erro": "usuário não encontrado"})
+		}
+
+		return c.JSON(http.StatusInternalServerError, map[string]string{"erro": "erro interno"})
+	}
+
+	return c.JSON(http.StatusOK, user)
 }
-func (h *Handler) AtualizaUser(c *echo.Context) error {
-	return c.String(http.StatusFound, "TASK específica")
+func (h *Handler) UpdateCurrentUser(c *echo.Context) error {
+	ctx := c.Request().Context()
+	req := new(model.UpdateUserRequest)
+
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"erro": "corpo da requisição inválido"})
+	}
+
+	if err := c.Validate(req); err != nil {
+		return c.JSON(http.StatusUnprocessableEntity, map[string]string{"erro": err.Error()})
+	}
+
+	userID, err := h.extractUserID(c)
+	if err != nil {
+		return err
+	}
+
+	if err = h.service.UpdateUser(ctx, userID, req); err != nil {
+		if errors.Is(err, apperrors.ErrEmailAlreadyExists) {
+			return c.JSON(http.StatusConflict, map[string]string{"erro": "email já cadastrado"})
+		}
+
+		return c.JSON(http.StatusInternalServerError, map[string]string{"erro": "erro interno"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"mensagem": "usuário atualizado com sucesso"})
 }
-func (h *Handler) AtualizaSenha(c *echo.Context) error {
-	return c.String(http.StatusFound, "Atualiza TASK")
+func (h *Handler) UpdatePassword(c *echo.Context) error {
+	ctx := c.Request().Context()
+	req := new(model.UpdatePasswordUserRequest)
+
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"erro": "corpo da requisição inválido"})
+	}
+
+	if err := c.Validate(req); err != nil {
+		return c.JSON(http.StatusUnprocessableEntity, map[string]string{"erro": err.Error()})
+	}
+
+	userID, err := h.extractUserID(c)
+	if err != nil {
+		return err
+	}
+
+	if err := h.service.UpdatePasswordUser(ctx, userID, req); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"erro": "erro interno"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"mensagem": "password atualizado com sucesso"})
 }
-func (h *Handler) DeletaUser(c *echo.Context) error {
-	return c.String(http.StatusFound, "Deleta TASK")
+func (h *Handler) DeleteCurrentUser(c *echo.Context) error {
+	ctx := c.Request().Context()
+
+	userID, err := h.extractUserID(c)
+	if err != nil {
+		return err
+	}
+
+	if err := h.service.DeleteUser(ctx, userID); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"erro": "erro interno"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"mensagem": "usuário deletado com sucesso"})
 }
 
 // Task
@@ -195,4 +268,20 @@ func (h *Handler) AtualizaSettings(c *echo.Context) error {
 // Timer
 func (h *Handler) AtualizaOTimer(c *echo.Context) error {
 	return c.String(http.StatusFound, "Deleta TASK")
+}
+
+func (h *Handler) extractUserID(c *echo.Context) (uuid.UUID, error) {
+	// Pega o token que o middleware colocou no contexto
+	token, err := echo.ContextGet[*jwt.Token](c, "user")
+	if err != nil {
+		return uuid.Nil, echo.ErrUnauthorized
+	}
+
+	// Converte os chaims para struct customizada
+	claims, ok := token.Claims.(*auth.Claims)
+	if !ok {
+		return uuid.Nil, echo.NewHTTPError(http.StatusInternalServerError, "erro ao processar token")
+	}
+
+	return claims.UserID, nil
 }
