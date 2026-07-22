@@ -55,10 +55,7 @@ func main() {
 	repo := repository.NewRepository(DB)
 	service := service.NewService(repo)
 	handler := handler.NewHandler(service)
-	err = routes.SetupRoutes(e, handler)
-	if err != nil {
-		slog.Error("erro ao iniciar rotas", "error", err)
-	}
+	routes.SetupRoutes(e, handler)
 
 	// Inicia o servidor
 	if err := e.Start(":8181"); err != nil {
