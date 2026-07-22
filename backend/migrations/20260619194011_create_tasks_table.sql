@@ -6,6 +6,7 @@ CREATE TABLE tasks (
     description          TEXT NOT NULL DEFAULT '',
     status               VARCHAR(50) NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending', 'in_progress', 'completed', 'archived')),
+    active               BOOLEAN NOT NULL DEFAULT TRUE,
     estimated_pomodoros  INTEGER NOT NULL DEFAULT 0,
     completed_pomodoros  INTEGER NOT NULL DEFAULT 0,
     created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
