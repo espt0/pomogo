@@ -28,7 +28,8 @@ type UpdateUserRequest struct {
 }
 
 type UpdatePasswordUserRequest struct {
-	Password string `json:"password" validate:"required,min=8,max=70"`
+	OldPassword string `json:"old_password" validate:"required,min=8,max=70"`
+	Password    string `json:"password" validate:"required,min=8,max=70"`
 }
 
 type LoginRequest struct {
