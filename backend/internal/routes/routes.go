@@ -8,7 +8,7 @@ import (
 	"github.com/labstack/echo/v5/middleware"
 )
 
-func SetupRoutes(e *echo.Echo, h *handler.Handler) error {
+func SetupRoutes(e *echo.Echo, h *handler.Handler) {
 	v1 := e.Group("/api/v1")
 
 	// Público
@@ -28,11 +28,11 @@ func SetupRoutes(e *echo.Echo, h *handler.Handler) error {
 	protected.DELETE("/users/me", h.DeleteCurrentUser)
 
 	// Task
-	protected.POST("/task", h.CreateTask)
-	protected.GET("/task", h.ListTasks)
-	protected.GET("/task/:id", h.GetTask)
-	protected.PATCH("/task/:id", h.UpdateTask)
-	protected.DELETE("/task/:id", h.DeleteTask)
+	protected.POST("/tasks", h.CreateTask)
+	protected.GET("/tasks", h.ListTasks)
+	protected.GET("/tasks/:id", h.GetTask)
+	protected.PATCH("/tasks/:id", h.UpdateTask)
+	protected.DELETE("/tasks/:id", h.DeleteTask)
 
 	// Sessions
 	protected.POST("/sessions", h.StartSession)
@@ -46,5 +46,4 @@ func SetupRoutes(e *echo.Echo, h *handler.Handler) error {
 	// Timer (SSE)
 	protected.GET("/time/stream", h.StreamTimer)
 
-	return nil
 }
