@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -42,7 +43,7 @@ func (s *Service) CreateUser(ctx context.Context, input *model.CreateUserRequest
 	if err != nil {
 		return fmt.Errorf("gerando id: %w", err)
 	}
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), 12)
 	if err != nil {
 		return fmt.Errorf("gerando hash da senha: %w", err)
 	}
@@ -66,7 +67,6 @@ func (s *Service) CreateUser(ctx context.Context, input *model.CreateUserRequest
 
 func (s *Service) LoginUser(ctx context.Context, input *model.LoginRequest) (string, string, error) {
 	email := strings.ToLower(strings.TrimSpace(input.Email))
-	password := strings.TrimSpace(input.Password)
 
 	user, err := s.repo.FindUserByEmail(ctx, email)
 	if err != nil {
@@ -77,11 +77,7 @@ func (s *Service) LoginUser(ctx context.Context, input *model.LoginRequest) (str
 		return "", "", fmt.Errorf("buscando usuario no login: %w", err)
 	}
 
-	if !user.Active {
-		return "", "", apperrors.ErrInvalidEmailOrPassword
-	}
-
-	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
 		return "", "", apperrors.ErrInvalidEmailOrPassword
 	}
 
@@ -119,14 +115,17 @@ func (s *Service) RotateTokens(ctx context.Context, refreshToken string) (string
 
 	hashRefreshToken := auth.HashRefreshToken(refreshToken)
 
-	rT, err := s.repo.FindActiveRefreshTokenByHash(ctx, hashRefreshToken)
+	rT, err := s.repo.FindRefreshTokenByHash(ctx, hashRefreshToken)
 	if err != nil {
-		if errors.Is(err, apperrors.ErrInvalidRefreshToken) {
-			// Adicionar depois 'RevokeAllUserTokens'
-			return "", "", apperrors.ErrInvalidRefreshToken
+		return "", "", apperrors.ErrInvalidRefreshToken
+	}
+	if rT.Revoked || rT.ExpiresAt.Before(time.Now()) {
+		if revokeErr := s.repo.RevokeAllUserTokens(ctx, rT.UserID); revokeErr != nil {
+			slog.Error("falha ao revogar tokens em possível reuso de refresh token",
+				"userID", rT.UserID, "err", revokeErr)
 		}
 
-		return "", "", fmt.Errorf("validando refresh token: %w", err)
+		return "", "", apperrors.ErrInvalidRefreshToken
 	}
 
 	newAccessToken, err := auth.GenerateAccessToken(rT.UserID)
@@ -188,8 +187,17 @@ func (s *Service) GetByID(ctx context.Context, userID uuid.UUID) (*model.User, e
 }
 
 func (s *Service) UpdateUser(ctx context.Context, userID uuid.UUID, input *model.UpdateUserRequest) error {
-	newEmail := strings.ToLower(strings.TrimSpace(*input.Email))
-	newName := strings.TrimSpace(*input.Name)
+	var newEmail *string
+	var newName *string
+
+	if input.Email != nil {
+		e := strings.ToLower(strings.TrimSpace(*input.Email))
+		newEmail = &e
+	}
+	if input.Name != nil {
+		n := strings.TrimSpace(*input.Name)
+		newName = &n
+	}
 
 	if err := s.repo.UpdateUser(ctx, newName, newEmail, userID); err != nil {
 		return fmt.Errorf("atualizando usuário: %w", err)
@@ -199,7 +207,21 @@ func (s *Service) UpdateUser(ctx context.Context, userID uuid.UUID, input *model
 }
 
 func (s *Service) UpdatePasswordUser(ctx context.Context, userID uuid.UUID, input *model.UpdatePasswordUserRequest) error {
-	newPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+
+	oldHash, err := s.repo.GetHashPasswordByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrUserNotFound) {
+			return apperrors.ErrUserNotFound
+		}
+
+		return fmt.Errorf("buscando hash no banco: %w", err)
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(oldHash), []byte(input.OldPassword)); err != nil {
+		return apperrors.ErrInvalidEmailOrPassword
+	}
+
+	newPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), 12)
 	if err != nil {
 		return fmt.Errorf("gerando hash da senha: %w", err)
 	}
@@ -208,12 +230,93 @@ func (s *Service) UpdatePasswordUser(ctx context.Context, userID uuid.UUID, inpu
 		return fmt.Errorf("atualizando password: %w", err)
 	}
 
+	if err = s.RevokeAllUserSessions(ctx, userID); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (s *Service) DeleteUser(ctx context.Context, userID uuid.UUID) error {
+	if err := s.RevokeAllUserSessions(ctx, userID); err != nil {
+		return err
+	}
+
 	if err := s.repo.DeleteUser(ctx, userID); err != nil {
 		return fmt.Errorf("deletando usuário: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error {
+	if err := s.repo.RevokeAllUserTokens(ctx, userID); err != nil {
+		return fmt.Errorf("revogando sessões: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) CreateTask(ctx context.Context, userID uuid.UUID, input *model.CreateTaskRequest) (*model.Task, error) {
+	id, err := s.gen.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("gerando id: %w", err)
+	}
+
+	task := &model.Task{
+		ID:                 id,
+		UserID:             userID,
+		Title:              input.Title,
+		Description:        input.Description,
+		Status:             "pending",
+		Active:             true,
+		EstimatedPomodoros: input.EstimatedPomodoros,
+		CompletedPomodoros: 0,
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+	}
+
+	if err := s.repo.CreateTask(ctx, task); err != nil {
+		return nil, fmt.Errorf("criando tarefa: %w", err)
+	}
+
+	return task, nil
+}
+
+func (s *Service) GetTasks(ctx context.Context, userID uuid.UUID) ([]model.Task, error) {
+	tasks, err := s.repo.GetTasksByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("buscando tarefas no banco: %w", err)
+	}
+
+	if tasks == nil {
+		return []model.Task{}, nil
+	}
+
+	return tasks, nil
+}
+
+func (s *Service) GetTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) (*model.Task, error) {
+	task, err := s.repo.GetTaskByID(ctx, userID, taskID)
+	if err != nil {
+		return nil, fmt.Errorf("buscando tarefa no banco: %w", err)
+	}
+
+	return task, nil
+}
+
+func (s *Service) UpdateTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID, input *model.UpdateTaskRequest) error {
+
+	if err := s.repo.UpdateTask(ctx, userID, taskID, input); err != nil {
+		return fmt.Errorf("atualizando tarefa: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) DeleteTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error {
+
+	if err := s.repo.DeleteTask(ctx, userID, taskID); err != nil {
+		return fmt.Errorf("deletando tarefa: %w", err)
 	}
 
 	return nil
