@@ -24,8 +24,15 @@ func NewRepository(DB *pgxpool.Pool) *Repository {
 
 func (r *Repository) EmailExists(ctx context.Context, email string) (bool, error) {
 	var exists bool
+	const query string = `
+		SELECT EXISTS(
+			SELECT 1 
+			FROM users 
+			WHERE email = $1 
+				AND active = true
+		)`
 
-	if err := r.DB.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND active = true)", email).Scan(&exists); err != nil {
+	if err := r.DB.QueryRow(ctx, query, email).Scan(&exists); err != nil {
 		return false, fmt.Errorf("erro ao verificar email: %w", err)
 	}
 
@@ -34,8 +41,14 @@ func (r *Repository) EmailExists(ctx context.Context, email string) (bool, error
 
 func (r *Repository) FindUserByEmail(ctx context.Context, email string) (*model.User, error) {
 	user := new(model.User)
+	const query string = `
+		SELECT id, name, email, password_hash, active, created_at, updated_at 
+		FROM users 
+		WHERE email = $1 
+			AND active = true
+		`
 
-	if err := r.DB.QueryRow(ctx, "SELECT id, name, email, password_hash, active, created_at, updated_at FROM users WHERE email = $1 AND active = true", email).Scan(&user.ID, &user.Name, &user.Email, &user.PasswordHash, &user.Active, &user.CreatedAt, &user.UpdatedAt); err != nil {
+	if err := r.DB.QueryRow(ctx, query, email).Scan(&user.ID, &user.Name, &user.Email, &user.PasswordHash, &user.Active, &user.CreatedAt, &user.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperrors.ErrUserNotFound
 		}
@@ -47,7 +60,14 @@ func (r *Repository) FindUserByEmail(ctx context.Context, email string) (*model.
 }
 
 func (r *Repository) CreateRefreshToken(ctx context.Context, input model.RefreshToken) error {
-	_, err := r.DB.Exec(ctx, "INSERT INTO refresh_token (id, user_id, token_hash, expires_at, revoked, created_at) VALUES($1, $2, $3, $4, $5, $6)", input.ID, input.UserID, input.TokenHash, input.ExpiresAt, input.Revoked, input.CreatedAt)
+	const query string = `
+		INSERT INTO refresh_token (
+			id, user_id, token_hash, expires_at, revoked, created_at
+		) VALUES (
+		 	$1, $2, $3, $4, $5, $6
+		)`
+
+	_, err := r.DB.Exec(ctx, query, input.ID, input.UserID, input.TokenHash, input.ExpiresAt, input.Revoked, input.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("erro ao salvar refresh token: %w", err)
 	}
@@ -56,7 +76,14 @@ func (r *Repository) CreateRefreshToken(ctx context.Context, input model.Refresh
 }
 
 func (r *Repository) CreateUser(ctx context.Context, user model.User) error {
-	_, err := r.DB.Exec(ctx, "INSERT INTO users (id, name, email, password_hash, active, created_at, updated_at) VALUES($1, $2, $3, $4, $5, $6, $7)", user.ID, user.Name, user.Email, user.PasswordHash, user.Active, user.CreatedAt, user.UpdatedAt)
+	const query string = `
+		INSERT INTO users (
+			id, name, email, password_hash, active, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7
+		)`
+
+	_, err := r.DB.Exec(ctx, query, user.ID, user.Name, user.Email, user.PasswordHash, user.Active, user.CreatedAt, user.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -71,22 +98,33 @@ func (r *Repository) CreateUser(ctx context.Context, user model.User) error {
 
 func (r *Repository) FindRefreshTokenByHash(ctx context.Context, hash string) (*model.RefreshToken, error) {
 	rT := new(model.RefreshToken)
-	err := r.DB.QueryRow(ctx,
-		"SELECT rt.id, rt.user_id, rt.token_hash, rt.expires_at, rt.revoked, rt.created_at FROM refresh_token rt JOIN users u ON rt.user_id = u.id WHERE token_hash = $1 AND u.active = true",
-		hash,
-	).Scan(&rT.ID, &rT.UserID, &rT.TokenHash, &rT.ExpiresAt, &rT.Revoked, &rT.CreatedAt)
+	const query string = `
+		SELECT rt.id, rt.user_id, rt.token_hash, rt.expires_at, rt.revoked, rt.created_at 
+		FROM refresh_token rt 
+		JOIN users u 
+			ON rt.user_id = u.id 
+		WHERE token_hash = $1 
+			AND u.active = true
+		`
+
+	err := r.DB.QueryRow(ctx, query, hash).Scan(&rT.ID, &rT.UserID, &rT.TokenHash, &rT.ExpiresAt, &rT.Revoked, &rT.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperrors.ErrInvalidRefreshToken
 		}
-		return nil, fmt.Errorf("erro ao refresh token usuário: %w", err)
+		return nil, fmt.Errorf("erro ao buscar refresh token: %w", err)
 	}
 	return rT, nil
 }
 
 func (r *Repository) RevokeRefreshToken(ctx context.Context, refreshTokenID uuid.UUID) error {
+	const query string = `
+		UPDATE refresh_token 
+		SET revoked = true 
+		WHERE id = $1
+		`
 
-	_, err := r.DB.Exec(ctx, "UPDATE refresh_token SET revoked = true WHERE id = $1", refreshTokenID)
+	_, err := r.DB.Exec(ctx, query, refreshTokenID)
 	if err != nil {
 		return fmt.Errorf("erro ao revogar refresh token: %w", err)
 	}
@@ -95,7 +133,13 @@ func (r *Repository) RevokeRefreshToken(ctx context.Context, refreshTokenID uuid
 }
 
 func (r *Repository) RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) error {
-	_, err := r.DB.Exec(ctx, "UPDATE refresh_token SET revoked = true WHERE token_hash = $1", tokenHash)
+	const query string = `
+		UPDATE refresh_token 
+		SET revoked = true 
+		WHERE token_hash = $1
+		`
+
+	_, err := r.DB.Exec(ctx, query, tokenHash)
 	if err != nil {
 		return fmt.Errorf("erro ao revogar refresh token por hash: %w", err)
 	}
@@ -104,8 +148,14 @@ func (r *Repository) RevokeRefreshTokenByHash(ctx context.Context, tokenHash str
 
 func (r *Repository) GetUserByID(ctx context.Context, userID uuid.UUID) (*model.User, error) {
 	user := new(model.User)
+	const query string = `
+		SELECT id, name, email, active, created_at, updated_at 
+		FROM users 
+		WHERE id = $1 
+			AND active = true
+		`
 
-	if err := r.DB.QueryRow(ctx, "SELECT id, name, email, active, created_at, updated_at FROM users WHERE id = $1 AND active = true", userID).Scan(&user.ID, &user.Name, &user.Email, &user.Active, &user.CreatedAt, &user.UpdatedAt); err != nil {
+	if err := r.DB.QueryRow(ctx, query, userID).Scan(&user.ID, &user.Name, &user.Email, &user.Active, &user.CreatedAt, &user.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperrors.ErrUserNotFound
 		}
@@ -117,7 +167,16 @@ func (r *Repository) GetUserByID(ctx context.Context, userID uuid.UUID) (*model.
 }
 
 func (r *Repository) UpdateUser(ctx context.Context, name, email *string, userID uuid.UUID) error {
-	cmdTag, err := r.DB.Exec(ctx, "UPDATE users SET name = COALESCE($1, name), email = COALESCE($2, email), updated_at = NOW() WHERE id = $3 AND active = true", name, email, userID)
+	const query string = `
+		UPDATE users 
+		SET name = COALESCE($1, name), 
+			email = COALESCE($2, email), 
+			updated_at = NOW() 
+		WHERE id = $3 
+			AND active = true
+		`
+
+	cmdTag, err := r.DB.Exec(ctx, query, name, email, userID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -136,8 +195,14 @@ func (r *Repository) UpdateUser(ctx context.Context, name, email *string, userID
 
 func (r *Repository) GetHashPasswordByID(ctx context.Context, userID uuid.UUID) (string, error) {
 	var hashPassword string
+	const query string = `
+		SELECT password_hash 
+		FROM users 
+		WHERE id = $1 
+			AND active = true
+		`
 
-	if err := r.DB.QueryRow(ctx, "SELECT password_hash FROM users WHERE id = $1 AND active = true", userID).Scan(&hashPassword); err != nil {
+	if err := r.DB.QueryRow(ctx, query, userID).Scan(&hashPassword); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", apperrors.ErrUserNotFound
 		}
@@ -149,7 +214,14 @@ func (r *Repository) GetHashPasswordByID(ctx context.Context, userID uuid.UUID) 
 }
 
 func (r *Repository) UpdatePassword(ctx context.Context, passwordHash string, userID uuid.UUID) error {
-	_, err := r.DB.Exec(ctx, "UPDATE users SET password_hash = $1 WHERE id = $2 AND active = true", passwordHash, userID)
+	const query string = `
+		UPDATE users 
+		SET password_hash = $1 
+		WHERE id = $2 
+			AND active = true
+		`
+
+	_, err := r.DB.Exec(ctx, query, passwordHash, userID)
 	if err != nil {
 		return fmt.Errorf("erro ao atualizar password: %w", err)
 	}
@@ -158,7 +230,14 @@ func (r *Repository) UpdatePassword(ctx context.Context, passwordHash string, us
 }
 
 func (r *Repository) DeleteUser(ctx context.Context, userID uuid.UUID) error {
-	cmdTag, err := r.DB.Exec(ctx, "UPDATE users SET active = false WHERE id = $1 AND active = true", userID)
+	const query string = `
+		UPDATE users 
+		SET active = false 
+		WHERE id = $1 
+			AND active = true
+		`
+
+	cmdTag, err := r.DB.Exec(ctx, query, userID)
 	if err != nil {
 		return fmt.Errorf("erro ao deletar usuário: %w", err)
 	}
@@ -171,7 +250,13 @@ func (r *Repository) DeleteUser(ctx context.Context, userID uuid.UUID) error {
 }
 
 func (r *Repository) RevokeAllUserTokens(ctx context.Context, userID uuid.UUID) error {
-	_, err := r.DB.Exec(ctx, "UPDATE refresh_token SET revoked = true WHERE user_id = $1", userID)
+	const query string = `
+		UPDATE refresh_token 
+		SET revoked = true 
+		WHERE user_id = $1
+		`
+
+	_, err := r.DB.Exec(ctx, query, userID)
 	if err != nil {
 		return fmt.Errorf("erro ao revogar todos os tokens do usuário: %w", err)
 	}
@@ -180,7 +265,14 @@ func (r *Repository) RevokeAllUserTokens(ctx context.Context, userID uuid.UUID) 
 }
 
 func (r *Repository) CreateTask(ctx context.Context, input *model.Task) error {
-	_, err := r.DB.Exec(ctx, "INSERT INTO tasks (id, user_id, title, description, status, active, estimated_pomodoros, completed_pomodoros, created_at, updated_at) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)", input.ID, input.UserID, input.Title, input.Description, input.Status, input.Active, input.EstimatedPomodoros, input.CompletedPomodoros, input.CreatedAt, input.UpdatedAt)
+	const query string = `
+		INSERT INTO tasks (
+			id, user_id, title, description, status, active, estimated_pomodoros, completed_pomodoros, created_at, updated_at
+		) VALUES (
+		 	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+		)`
+
+	_, err := r.DB.Exec(ctx, query, input.ID, input.UserID, input.Title, input.Description, input.Status, input.Active, input.EstimatedPomodoros, input.CompletedPomodoros, input.CreatedAt, input.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("erro ao criar task: %w", err)
 	}
@@ -189,7 +281,14 @@ func (r *Repository) CreateTask(ctx context.Context, input *model.Task) error {
 }
 
 func (r *Repository) GetTasksByID(ctx context.Context, userID uuid.UUID) ([]model.Task, error) {
-	rows, err := r.DB.Query(ctx, "SELECT id, user_id, title, description, status, estimated_pomodoros, completed_pomodoros, created_at, updated_at FROM tasks WHERE user_id = $1 AND active = true", userID)
+	const query string = `
+		SELECT id, user_id, title, description, status, estimated_pomodoros, completed_pomodoros, created_at, updated_at 
+		FROM tasks 
+		WHERE user_id = $1 
+			AND active = true
+		`
+
+	rows, err := r.DB.Query(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao buscar tasks: %w", err)
 	}
@@ -213,8 +312,15 @@ func (r *Repository) GetTasksByID(ctx context.Context, userID uuid.UUID) ([]mode
 
 func (r *Repository) GetTaskByID(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) (*model.Task, error) {
 	task := new(model.Task)
+	const query string = `
+		SELECT id, user_id, title, description, status, estimated_pomodoros, completed_pomodoros, created_at, updated_at 
+		FROM tasks 
+		WHERE user_id = $1 
+			AND id = $2 
+			AND active = true
+		`
 
-	if err := r.DB.QueryRow(ctx, "SELECT id, user_id, title, description, status, estimated_pomodoros, completed_pomodoros, created_at, updated_at FROM tasks WHERE user_id = $1 AND id = $2 AND active = true", userID, taskID).Scan(&task.ID, &task.UserID, &task.Title, &task.Description, &task.Status, &task.EstimatedPomodoros, &task.CompletedPomodoros, &task.CreatedAt, &task.UpdatedAt); err != nil {
+	if err := r.DB.QueryRow(ctx, query, userID, taskID).Scan(&task.ID, &task.UserID, &task.Title, &task.Description, &task.Status, &task.EstimatedPomodoros, &task.CompletedPomodoros, &task.CreatedAt, &task.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperrors.ErrNotFound
 		}
@@ -226,7 +332,20 @@ func (r *Repository) GetTaskByID(ctx context.Context, userID uuid.UUID, taskID u
 }
 
 func (r *Repository) UpdateTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID, input *model.UpdateTaskRequest) error {
-	cmdTag, err := r.DB.Exec(ctx, "UPDATE tasks SET title = COALESCE($1, title), description = COALESCE($2, description), status = COALESCE($3, status), estimated_pomodoros = COALESCE($4, estimated_pomodoros), completed_pomodoros = COALESCE($5, completed_pomodoros), updated_at = NOW() WHERE id = $6 AND user_id = $7 AND active = true", input.Title, input.Description, input.Status, input.EstimatedPomodoros, input.CompletedPomodoros, taskID, userID)
+	const query string = `
+		UPDATE tasks 
+		SET title = COALESCE($1, title), 
+			description = COALESCE($2, description), 
+			status = COALESCE($3, status), 
+			estimated_pomodoros = COALESCE($4, estimated_pomodoros), 
+			completed_pomodoros = COALESCE($5, completed_pomodoros), 
+			updated_at = NOW() 
+		WHERE id = $6 
+			AND user_id = $7 
+			AND active = true
+		`
+
+	cmdTag, err := r.DB.Exec(ctx, query, input.Title, input.Description, input.Status, input.EstimatedPomodoros, input.CompletedPomodoros, taskID, userID)
 	if err != nil {
 		return fmt.Errorf("erro ao atualizar task: %w", err)
 	}
@@ -239,7 +358,15 @@ func (r *Repository) UpdateTask(ctx context.Context, userID uuid.UUID, taskID uu
 }
 
 func (r *Repository) DeleteTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error {
-	cmdTag, err := r.DB.Exec(ctx, "UPDATE tasks SET active = false WHERE id = $1 AND user_id = $2 AND active = true", taskID, userID)
+	const query string = `
+		UPDATE tasks 
+		SET active = false 
+		WHERE id = $1 
+			AND user_id = $2 
+			AND active = true
+		`
+
+	cmdTag, err := r.DB.Exec(ctx, query, taskID, userID)
 	if err != nil {
 		return fmt.Errorf("erro ao deletar task: %w", err)
 	}
