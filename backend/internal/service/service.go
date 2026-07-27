@@ -58,8 +58,30 @@ func (s *Service) CreateUser(ctx context.Context, input *model.CreateUserRequest
 		UpdatedAt:    time.Now(),
 	}
 
-	if err := s.repo.CreateUser(ctx, user); err != nil {
+	if err := s.repo.CreateUser(ctx, &user); err != nil {
 		return fmt.Errorf("criando usuário: %w", err)
+	}
+
+	settingsID, err := s.gen.NewV7()
+	if err != nil {
+		return fmt.Errorf("gerando id das configurações: %w", err)
+	}
+
+	settings := model.Settings{
+		ID:                 settingsID,
+		UserID:             id,
+		WorkDuration:       1500,
+		ShortBreakDuration: 300,
+		LongBreakDuration:  900,
+		LongBreakInterval:  4,
+		AutoStartWork:      false,
+		AutoStartBreak:     true,
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+	}
+
+	if err := s.repo.CreateSettings(ctx, &settings); err != nil {
+		return fmt.Errorf("criando configuração padrão: %w", err)
 	}
 
 	return nil
@@ -104,7 +126,7 @@ func (s *Service) LoginUser(ctx context.Context, input *model.LoginRequest) (str
 		CreatedAt: time.Now(),
 	}
 
-	if err = s.repo.CreateRefreshToken(ctx, refreshTokenSave); err != nil {
+	if err = s.repo.CreateRefreshToken(ctx, &refreshTokenSave); err != nil {
 		return "", "", fmt.Errorf("salvando refresh token: %w", err)
 	}
 
@@ -154,7 +176,7 @@ func (s *Service) RotateTokens(ctx context.Context, refreshToken string) (string
 		Revoked:   false,
 		CreatedAt: time.Now(),
 	}
-	if err = s.repo.CreateRefreshToken(ctx, newRefreshTokenSave); err != nil {
+	if err = s.repo.CreateRefreshToken(ctx, &newRefreshTokenSave); err != nil {
 		return "", "", fmt.Errorf("salvando refresh token: %w", err)
 	}
 
@@ -317,6 +339,25 @@ func (s *Service) DeleteTask(ctx context.Context, userID uuid.UUID, taskID uuid.
 
 	if err := s.repo.DeleteTask(ctx, userID, taskID); err != nil {
 		return fmt.Errorf("deletando tarefa: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) GetSettings(ctx context.Context, userID uuid.UUID) (*model.Settings, error) {
+
+	settings, err := s.repo.GetSettingsByUserID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("buscando configurações no banco: %w", err)
+	}
+
+	return settings, nil
+}
+
+func (s *Service) UpdateSettingsUser(ctx context.Context, userID uuid.UUID, input *model.UpdateSettingsRequest) error {
+
+	if err := s.repo.UpdateSettings(ctx, userID, input); err != nil {
+		return fmt.Errorf("atualizando configuração: %w", err)
 	}
 
 	return nil

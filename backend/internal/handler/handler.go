@@ -382,10 +382,51 @@ func (h *Handler) ListSessions(c *echo.Context) error {
 
 // Settings
 func (h *Handler) GetSettings(c *echo.Context) error {
-	return c.String(http.StatusFound, "Atualiza TASK")
+	ctx := c.Request().Context()
+
+	userID, err := h.extractUserID(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"erro": "não autorizado"})
+	}
+
+	settings, err := h.service.GetSettings(ctx, userID)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrNotFound) {
+			return c.JSON(http.StatusNotFound, map[string]string{"erro": "configuração não encontrada"})
+		}
+
+		return c.JSON(http.StatusInternalServerError, map[string]string{"erro": "erro interno"})
+	}
+
+	return c.JSON(http.StatusOK, settings)
 }
 func (h *Handler) UpdateSettings(c *echo.Context) error {
-	return c.String(http.StatusFound, "Deleta TASK")
+	ctx := c.Request().Context()
+
+	userID, err := h.extractUserID(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"erro": "não autorizado"})
+	}
+
+	req := new(model.UpdateSettingsRequest)
+
+	if err := c.Bind(req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"erro": "corpo da requisição inválido"})
+	}
+
+	if err := c.Validate(req); err != nil {
+		return c.JSON(http.StatusUnprocessableEntity, map[string]string{"erro": err.Error()})
+	}
+
+	if err := h.service.UpdateSettingsUser(ctx, userID, req); err != nil {
+		if errors.Is(err, apperrors.ErrNotFound) {
+			return c.JSON(http.StatusNotFound, map[string]string{"erro": "configuração não encontrada"})
+		}
+
+		return c.JSON(http.StatusInternalServerError, map[string]string{"erro": "erro interno"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"mensagem": "configuração atualizada com sucesso"})
 }
 
 // Timer

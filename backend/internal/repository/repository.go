@@ -59,7 +59,7 @@ func (r *Repository) FindUserByEmail(ctx context.Context, email string) (*model.
 	return user, nil
 }
 
-func (r *Repository) CreateRefreshToken(ctx context.Context, input model.RefreshToken) error {
+func (r *Repository) CreateRefreshToken(ctx context.Context, input *model.RefreshToken) error {
 	const query string = `
 		INSERT INTO refresh_token (
 			id, user_id, token_hash, expires_at, revoked, created_at
@@ -75,7 +75,7 @@ func (r *Repository) CreateRefreshToken(ctx context.Context, input model.Refresh
 	return nil
 }
 
-func (r *Repository) CreateUser(ctx context.Context, user model.User) error {
+func (r *Repository) CreateUser(ctx context.Context, input *model.User) error {
 	const query string = `
 		INSERT INTO users (
 			id, name, email, password_hash, active, created_at, updated_at
@@ -83,7 +83,7 @@ func (r *Repository) CreateUser(ctx context.Context, user model.User) error {
 			$1, $2, $3, $4, $5, $6, $7
 		)`
 
-	_, err := r.DB.Exec(ctx, query, user.ID, user.Name, user.Email, user.PasswordHash, user.Active, user.CreatedAt, user.UpdatedAt)
+	_, err := r.DB.Exec(ctx, query, input.ID, input.Name, input.Email, input.PasswordHash, input.Active, input.CreatedAt, input.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -374,5 +374,65 @@ func (r *Repository) DeleteTask(ctx context.Context, userID uuid.UUID, taskID uu
 	if cmdTag.RowsAffected() == 0 {
 		return apperrors.ErrNotFound
 	}
+	return nil
+}
+
+func (r *Repository) CreateSettings(ctx context.Context, input *model.Settings) error {
+	const query string = `
+		INSERT INTO settings (
+			id, user_id, work_duration, short_break_duration, long_break_duration, long_break_interval, auto_start_work, auto_start_break, created_at, updated_at
+		) VALUES (
+		 	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+		)`
+
+	_, err := r.DB.Exec(ctx, query, input.ID, input.UserID, input.WorkDuration, input.ShortBreakDuration, input.LongBreakDuration, input.LongBreakInterval, input.AutoStartWork, input.AutoStartBreak, input.CreatedAt, input.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("erro ao criar configuração padrão: %w", err)
+	}
+
+	return nil
+}
+
+func (r *Repository) GetSettingsByUserID(ctx context.Context, userID uuid.UUID) (*model.Settings, error) {
+	settings := new(model.Settings)
+	const query string = `
+		SELECT id, user_id, work_duration, short_break_duration, long_break_duration, long_break_interval, auto_start_work, auto_start_break, created_at, updated_at 
+		FROM settings 
+		WHERE user_id = $1 
+		`
+
+	if err := r.DB.QueryRow(ctx, query, userID).Scan(&settings.ID, &settings.UserID, &settings.WorkDuration, &settings.ShortBreakDuration, &settings.LongBreakDuration, &settings.LongBreakInterval, &settings.AutoStartWork, &settings.AutoStartBreak, &settings.CreatedAt, &settings.UpdatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.ErrNotFound
+		}
+
+		return nil, fmt.Errorf("erro ao buscar configuração: %w", err)
+	}
+
+	return settings, nil
+}
+
+func (r *Repository) UpdateSettings(ctx context.Context, userID uuid.UUID, input *model.UpdateSettingsRequest) error {
+	const query string = `
+		UPDATE settings 
+		SET work_duration = COALESCE($1, work_duration), 
+			short_break_duration = COALESCE($2, short_break_duration), 
+			long_break_duration = COALESCE($3, long_break_duration), 
+			long_break_interval = COALESCE($4, long_break_interval),  
+			auto_start_work = COALESCE($5, auto_start_work),
+    		auto_start_break = COALESCE($6, auto_start_break),
+			updated_at = NOW() 
+		WHERE user_id = $7  
+		`
+
+	cmdTag, err := r.DB.Exec(ctx, query, input.WorkDuration, input.ShortBreakDuration, input.LongBreakDuration, input.LongBreakInterval, input.AutoStartWork, input.AutoStartBreak, userID)
+	if err != nil {
+		return fmt.Errorf("erro ao atualizar configuração: %w", err)
+	}
+
+	if cmdTag.RowsAffected() == 0 {
+		return apperrors.ErrNotFound
+	}
+
 	return nil
 }
