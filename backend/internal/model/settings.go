@@ -16,7 +16,7 @@ type Settings struct {
 	AutoStartWork      bool      `json:"auto_start_work" db:"auto_start_work"`
 	AutoStartBreak     bool      `json:"auto_start_break" db:"auto_start_break"`
 	CreatedAt          time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at" db:"updated_at "`
+	UpdatedAt          time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type UpdateSettingsRequest struct {
@@ -24,4 +24,6 @@ type UpdateSettingsRequest struct {
 	ShortBreakDuration *int64 `json:"short_break_duration" validate:"omitempty,min=1,max=40"`
 	LongBreakDuration  *int64 `json:"long_break_duration" validate:"omitempty,min=1,max=80"`
 	LongBreakInterval  *int64 `json:"long_break_interval" validate:"omitempty,min=1,max=20"`
+	AutoStartWork      *bool  `json:"auto_start_work" validate:"omitempty"`
+	AutoStartBreak     *bool  `json:"auto_start_break" validate:"omitempty"`
 }
